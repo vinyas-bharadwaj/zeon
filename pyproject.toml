@@ -1,0 +1,28 @@
+[project]
+name = "zeon"
+version = "0.2.0"
+description = "CLI tool to scaffold a FastAPI project structure"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+
+authors = [
+  { name = "Vinyas Bharadwaj", email = "vinyasbharadwaj101@gmail.com" }
+]
+
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "sqlalchemy",
+  "passlib[bcrypt]",
+  "pyJWT",
+  "python-dotenv",
+  "pydantic",
+]
+
+[project.scripts]
+zeon = "main:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
