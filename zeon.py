@@ -10,6 +10,7 @@ app = typer.Typer()
 
 def create_structure(project_name: str):
     base_path = Path(project_name)
+    venv_path = base_path / 'venv'
     app_path = base_path / "app"
     routers_path = app_path / "routers"
     app_path.mkdir(parents=True, exist_ok=True)
@@ -34,7 +35,7 @@ def create_structure(project_name: str):
 
     # step 1: Creating virtual environment
     typer.echo("Creating virtual environment...")
-    subprocess.run([sys.executable, '-m', 'venv', str(base_path)], check=True)
+    subprocess.run([sys.executable, '-m', 'venv', str(venv_path)], check=True)
 
     # step 2: install all the dependencies from requirements.txt
     typer.echo("Installing dependencies in virtual environment...")
