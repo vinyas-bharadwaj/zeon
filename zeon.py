@@ -41,9 +41,9 @@ def create_structure(project_name: str):
     typer.echo("Installing dependencies in virtual environment...")
     
     if sys.platform == 'win32':
-        pip_path = base_path / 'Scripts' / 'pip'
+        pip_path = venv_path / 'Scripts' / 'pip'
     else:
-        pip_path = base_path / 'bin' / 'pip'
+        pip_path = venv_path / 'bin' / 'pip'
 
     subprocess.run([str(pip_path), "install", "-r", str(base_path / 'requirements.txt')], check=True)
 
