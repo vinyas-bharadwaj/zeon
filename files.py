@@ -1,18 +1,16 @@
-import argparse
-from pathlib import Path    
-import secrets
 import textwrap
+import secrets
 
 main_py_content = textwrap.dedent("""\
     from fastapi import FastAPI
     from .database import Base, engine
-    from .routers import auth
+    from .routers.auth import router as auth_router
 
     app = FastAPI()
 
     Base.metadata.create_all(bind=engine)
 
-    app.include_router(auth.router)
+    app.include_router(auth_router)
 
     @app.get("/")
     def home():
@@ -271,38 +269,3 @@ requirements_content = textwrap.dedent("""\
     watchfiles==1.0.5
     websockets==15.0.1
 """)
-
-def create_structure(project_name: str):
-    base_path = Path(project_name)
-    app_path = base_path / "app"
-    routers_path = app_path / "routers"
-    app_path.mkdir(parents=True, exist_ok=True)
-    routers_path.mkdir(parents=True, exist_ok=True)
-
-    (base_path / ".gitignore").write_text(gitignore_content)
-    (base_path / ".env").write_text(env_content)
-
-    (app_path / "__init__.py").touch()
-    (app_path / "main.py").write_text(main_py_content)
-    (app_path / "database.py").write_text(database_py_content)
-    (app_path / "models.py").write_text(models_py_content)
-    (app_path / "schemas.py").write_text(schemas_py_content)
-    (app_path / "utils.py").write_text(utils_py_content)
-    (app_path / "oauth2.py").write_text(oauth2_py_content)
-
-    (routers_path / "__init__.py").touch()
-    (routers_path / "auth.py").write_text(routers_auth_py_content)
-
-    (base_path / "requirements.txt").write_text(requirements_content)
-
-    print(f"✅ Your FastAPI project '{project_name}' created successfully.")
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Initialize a FastAPI project.")
-    parser.add_argument("name", help="Name of the project")
-    args = parser.parse_args()
-    create_structure(args.name)
-
-if __name__ == "__main__":
-    main()
