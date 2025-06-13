@@ -116,6 +116,32 @@ def routers(router_name: str, project_name: str = "."):
 
     typer.echo(f"Router '{router_name}' created and added to app/main.py")
 
+@app.command()
+def add(package_name: str, project_name: str = "."):
+    """
+    Install a Python package into the venv and add it to requirements.txt
+    """
+    base_path = Path(project_name)
+    venv_path = base_path / "venv"
+    requirements_path = base_path / "requirements.txt"
+
+    if not venv_path.exists():
+        typer.echo("❌ No virtual environment found. Please initialize the project first.")
+        raise typer.Exit()
+
+    # Determine pip path based on OS
+    pip_path = venv_path / ("Scripts" if sys.platform == "win32" else "bin") / "pip"
+
+    # Install the package
+    typer.echo(f"📦 Installing {package_name}...")
+    subprocess.run([str(pip_path), "install", package_name], check=True)
+
+    # Freeze current state of installed packages into requirements.txt
+    freeze_result = subprocess.run([str(pip_path), "freeze"], capture_output=True, text=True, check=True)
+    requirements_path.write_text(freeze_result.stdout)
+
+    typer.echo(f"✅ Package '{package_name}' installed and added to requirements.txt")
+
 
 
 if __name__ == "__main__":
