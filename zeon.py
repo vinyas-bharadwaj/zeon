@@ -15,6 +15,13 @@ def create_structure(project_name: str):
     routers_path = app_path / "routers"
     app_path.mkdir(parents=True, exist_ok=True)
     routers_path.mkdir(parents=True, exist_ok=True)
+        
+    if sys.platform == 'win32':
+        pip_path = venv_path / 'Scripts' / 'pip'
+    else:
+        pip_path = venv_path / 'bin' / 'pip'
+
+    alembic_setup_flag = typer.confirm("Would you like to include Alembic setup?")
 
     (base_path / ".gitignore").write_text(files.gitignore_content)
     (base_path / ".env").write_text(files.env_content)
@@ -36,18 +43,49 @@ def create_structure(project_name: str):
     # step 1: Creating virtual environment
     typer.echo("Creating virtual environment...")
     subprocess.run([sys.executable, '-m', 'venv', str(venv_path)], check=True)
+    
+    # Setup alembic if the user selected yes
+    if alembic_setup_flag:
+        subprocess.run([str(pip_path), "install", "alembic"], check=True)
+        alembic_init(base_path, pip_path)
 
     # step 2: install all the dependencies from requirements.txt
     typer.echo("Installing dependencies in virtual environment...")
-    
-    if sys.platform == 'win32':
-        pip_path = venv_path / 'Scripts' / 'pip'
-    else:
-        pip_path = venv_path / 'bin' / 'pip'
 
     subprocess.run([str(pip_path), "install", "-r", str(base_path / 'requirements.txt')], check=True)
 
     typer.echo(f"Project {project_name} initialized successfully!")
+
+
+def alembic_init(base_path, pip_path):
+    alembic_dir = base_path / "alembic"
+    alembic_ini = base_path / "alembic.ini"
+
+    if not alembic_dir.exists():
+        typer.echo("Initializing Alembic...")
+        subprocess.run([str(pip_path.parent / "alembic"), "init", "alembic"], cwd=base_path, check=True)
+
+        # Modify alembic.ini
+        ini_text = alembic_ini.read_text()
+        ini_text = ini_text.replace(
+            "sqlalchemy.url = driver://user:pass@localhost/dbname",
+            "sqlalchemy.url = sqlite:///./sql_app.db"
+        )
+        alembic_ini.write_text(ini_text)
+
+        # Modify env.py to import Base from your app
+        env_path = alembic_dir / "env.py"
+        env_text = env_path.read_text()
+
+        insert_import = "from app.database import Base"
+        insert_metadata = "target_metadata = Base.metadata"
+
+        env_text = insert_import + "\n" + env_text
+        env_text = env_text.replace("target_metadata = None", insert_metadata)
+        env_path.write_text(env_text)
+
+        typer.echo("✅ Alembic initialized and configured.")
+
 
 
 @app.command()
@@ -142,6 +180,40 @@ def add(package_name: str, project_name: str = "."):
 
     typer.echo(f"✅ Package '{package_name}' installed and added to requirements.txt")
 
+
+@app.command()
+def makemigrations(message: str = "auto", project_name: str = "."):
+    """
+    Create Alembic migration script based on models
+    """
+    base_path = Path(project_name)
+    venv_path = base_path / 'venv'
+    alembic_path = venv_path / ("Scripts" if sys.platform == "win32" else "bin") / "alembic"
+    alembic_ini = base_path / "alembic.ini"
+
+    if not alembic_ini.exists():
+        typer.echo("❌ Alembic not initialized. Run 'alembic init alembic' first.")
+        raise typer.Exit()
+
+    subprocess.run([str(alembic_path), "-c", str(alembic_ini), "revision", "--autogenerate", "-m", message], cwd=base_path, check=True)
+    typer.echo("✅ Migration script created.")
+
+@app.command()
+def migrate(project_name: str = "."):
+    """
+    Apply migrations to the database
+    """
+    base_path = Path(project_name)
+    venv_path = base_path / 'venv'
+    alembic_path = venv_path / ("Scripts" if sys.platform == "win32" else "bin") / "alembic"
+    alembic_ini = base_path / "alembic.ini"
+
+    if not alembic_ini.exists():
+        typer.echo("❌ Alembic not initialized. Run 'alembic init alembic' first.")
+        raise typer.Exit()
+    
+    subprocess.run([str(alembic_path), "-c", str(alembic_ini), "upgrade", "head"], check=True)
+    typer.echo("✅ Migrations applied to database.")
 
 
 if __name__ == "__main__":
