@@ -4,15 +4,33 @@ import typer
 import textwrap
 import subprocess
 import sys
+from config_manager import (
+    get_project_configuration, 
+    get_database_config, 
+    get_auth_config,
+    generate_env_content,
+    generate_requirements,
+    DatabaseChoice,
+    AuthChoice,
+    FeatureChoice
+)
+from file_generators import CustomizedFileGenerator, AdditionalTemplates
 
 app = typer.Typer()
 
 
-def create_structure(project_name: str):
+def create_structure(project_name: str, interactive: bool = True):
+    """Create project structure with customizable options"""
+    
+    # Get project configuration
+    config = get_project_configuration(project_name, interactive)
+    
     base_path = Path(project_name)
     venv_path = base_path / 'venv'
     app_path = base_path / "app"
     routers_path = app_path / "routers"
+    
+    # Create directories
     app_path.mkdir(parents=True, exist_ok=True)
     routers_path.mkdir(parents=True, exist_ok=True)
         
@@ -21,56 +39,159 @@ def create_structure(project_name: str):
     else:
         pip_path = venv_path / 'bin' / 'pip'
 
-    alembic_setup_flag = typer.confirm("Would you like to include Alembic setup?")
+    # Get configuration-based content
+    db_config = get_database_config(config.database)
+    auth_config = get_auth_config(config.auth)
+    file_generator = CustomizedFileGenerator(config)
 
+    # Create base files
     (base_path / ".gitignore").write_text(files.gitignore_content)
-    (base_path / ".env").write_text(files.env_content)
+    (base_path / ".env").write_text(generate_env_content(config))
+    (base_path / "requirements.txt").write_text(generate_requirements(config))
 
+    # Create app files
     (app_path / "__init__.py").touch()
-    (app_path / "main.py").write_text(files.main_py_content)
-    (app_path / "database.py").write_text(files.database_py_content)
-    (app_path / "models.py").write_text(files.models_py_content)
+    (app_path / "main.py").write_text(file_generator.generate_main_py())
+    
+    # Database configuration
+    (app_path / "database.py").write_text(db_config["database_py"])
+    
+    # Models (use custom models for NoSQL databases)
+    if config.database in [DatabaseChoice.MONGODB, DatabaseChoice.FIREBASE]:
+        if "models_py" in db_config:
+            (app_path / "models.py").write_text(db_config["models_py"])
+        else:
+            (app_path / "models.py").write_text(files.models_py_content)
+    else:
+        (app_path / "models.py").write_text(files.models_py_content)
+    
+    # Schemas
     (app_path / "schemas.py").write_text(files.schemas_py_content)
-    (app_path / "utils.py").write_text(files.utils_py_content)
-    (app_path / "oauth2.py").write_text(files.oauth2_py_content)
+    
+    # Utils (only for databases that need password hashing)
+    if config.auth == AuthChoice.JWT and config.database not in [DatabaseChoice.MONGODB, DatabaseChoice.FIREBASE]:
+        (app_path / "utils.py").write_text(files.utils_py_content)
+    elif config.database in [DatabaseChoice.MONGODB, DatabaseChoice.FIREBASE]:
+        (app_path / "utils.py").write_text(files.utils_py_content)
+    else:
+        (app_path / "utils.py").touch()
+    
+    # Auth configuration
+    if config.auth != AuthChoice.NONE:
+        (app_path / "oauth2.py").write_text(auth_config.get("oauth2_py", ""))
+        (routers_path / "__init__.py").touch()
+        (routers_path / "auth.py").write_text(file_generator.generate_auth_router())
+    else:
+        (routers_path / "__init__.py").touch()
 
-    (routers_path / "__init__.py").touch()
-    (routers_path / "auth.py").write_text(files.routers_auth_py_content)
+    # Handle additional features
+    handle_additional_features(config, base_path)
 
-
-    (base_path / "requirements.txt").write_text(files.requirements_content)
-
-    # step 1: Creating virtual environment
-    typer.echo("Creating virtual environment...")
+    # Create virtual environment
+    typer.echo("🔧 Creating virtual environment...")
     subprocess.run([sys.executable, '-m', 'venv', str(venv_path)], check=True)
     
-    # Setup alembic if the user selected yes
-    if alembic_setup_flag:
+    # Setup alembic if selected
+    if FeatureChoice.ALEMBIC in config.features:
         subprocess.run([str(pip_path), "install", "alembic"], check=True)
-        alembic_init(base_path, pip_path)
+        alembic_init(base_path, pip_path, config)
 
-    # step 2: install all the dependencies from requirements.txt
-    typer.echo("Installing dependencies in virtual environment...")
-
+    # Install dependencies
+    typer.echo("📦 Installing dependencies in virtual environment...")
     subprocess.run([str(pip_path), "install", "-r", str(base_path / 'requirements.txt')], check=True)
 
-    typer.echo(f"Project {project_name} initialized successfully!")
+    # Show completion message with instructions
+    show_completion_message(project_name, config)
 
 
-def alembic_init(base_path, pip_path):
+def handle_additional_features(config, base_path):
+    """Handle additional features setup"""
+    
+    # Docker setup
+    if FeatureChoice.DOCKER in config.features:
+        docker_files = AdditionalTemplates.get_docker_files()
+        for filename, content in docker_files.items():
+            file_path = base_path / filename
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(content)
+    
+    # Testing setup
+    if FeatureChoice.TESTING in config.features:
+        test_files = AdditionalTemplates.get_testing_files()
+        for filename, content in test_files.items():
+            file_path = base_path / filename
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(content)
+
+
+def show_completion_message(project_name: str, config):
+    """Show completion message with next steps"""
+    typer.echo(f"\n🎉 Project {project_name} initialized successfully!")
+    typer.echo("=" * 50)
+    typer.echo(f"📊 Configuration:")
+    typer.echo(f"   Database: {config.database.value}")
+    typer.echo(f"   Authentication: {config.auth.value}")
+    if config.features:
+        typer.echo(f"   Features: {', '.join([f.value for f in config.features])}")
+    
+    typer.echo(f"\n🚀 Next steps:")
+    typer.echo(f"   1. cd {project_name}")
+    typer.echo(f"   2. Update .env file with your database credentials")
+    
+    if config.database == DatabaseChoice.POSTGRESQL:
+        typer.echo(f"   3. Make sure PostgreSQL is running")
+    elif config.database == DatabaseChoice.MONGODB:
+        typer.echo(f"   3. Make sure MongoDB is running")
+    elif config.database == DatabaseChoice.SUPABASE:
+        typer.echo(f"   3. Update .env with your Supabase credentials")
+    elif config.database == DatabaseChoice.FIREBASE:
+        typer.echo(f"   3. Add your Firebase service account JSON file")
+    
+    if FeatureChoice.ALEMBIC in config.features:
+        typer.echo(f"   4. Run: zeon makemigrations \"Initial migration\"")
+        typer.echo(f"   5. Run: zeon migrate")
+        typer.echo(f"   6. Start development: uvicorn app.main:app --reload")
+    else:
+        typer.echo(f"   4. Start development: uvicorn app.main:app --reload")
+    
+    if FeatureChoice.DOCKER in config.features:
+        typer.echo(f"\n🐳 Docker commands:")
+        typer.echo(f"   Build: docker-compose build")
+        typer.echo(f"   Run: docker-compose up")
+    
+    if FeatureChoice.TESTING in config.features:
+        typer.echo(f"\n🧪 Testing:")
+        typer.echo(f"   Run tests: pytest")
+
+
+def alembic_init(base_path, pip_path, config):
+    """Initialize Alembic with proper configuration"""
     alembic_dir = base_path / "alembic"
     alembic_ini = base_path / "alembic.ini"
 
     if not alembic_dir.exists():
-        typer.echo("Initializing Alembic...")
+        typer.echo("⚙️  Initializing Alembic...")
         subprocess.run([str(pip_path.parent / "alembic"), "init", "alembic"], cwd=base_path, check=True)
 
-        # Modify alembic.ini
+        # Modify alembic.ini based on database choice
         ini_text = alembic_ini.read_text()
-        ini_text = ini_text.replace(
-            "sqlalchemy.url = driver://user:pass@localhost/dbname",
-            "sqlalchemy.url = sqlite:///./sql_app.db"
-        )
+        
+        if config.database == DatabaseChoice.SQLITE:
+            ini_text = ini_text.replace(
+                "sqlalchemy.url = driver://user:pass@localhost/dbname",
+                "sqlalchemy.url = sqlite:///./sql_app.db"
+            )
+        elif config.database == DatabaseChoice.POSTGRESQL:
+            ini_text = ini_text.replace(
+                "sqlalchemy.url = driver://user:pass@localhost/dbname",
+                "sqlalchemy.url = postgresql://user:password@localhost/dbname"
+            )
+        elif config.database == DatabaseChoice.SUPABASE:
+            ini_text = ini_text.replace(
+                "sqlalchemy.url = driver://user:pass@localhost/dbname",
+                "sqlalchemy.url = postgresql://postgres:password@db.your-project.supabase.co:5432/postgres"
+            )
+        
         alembic_ini.write_text(ini_text)
 
         # Modify env.py to import Base from your app
@@ -89,9 +210,12 @@ def alembic_init(base_path, pip_path):
 
 
 @app.command()
-def init(project_name: str):
-    """Initializes the FastAPI project"""
-    create_structure(project_name)
+def init(
+    project_name: str,
+    quick: bool = typer.Option(False, "--quick", "-q", help="Skip interactive configuration and use defaults")
+):
+    """Initializes the FastAPI project with customizable options"""
+    create_structure(project_name, interactive=not quick)
 
 @app.command()
 def routers(router_name: str, project_name: str = "."):
@@ -214,6 +338,178 @@ def migrate(project_name: str = "."):
     
     subprocess.run([str(alembic_path), "-c", str(alembic_ini), "upgrade", "head"], check=True)
     typer.echo("✅ Migrations applied to database.")
+
+@app.command()
+def create(
+    project_name: str,
+    database: DatabaseChoice = typer.Option(DatabaseChoice.SQLITE, "--db", help="Database to use"),
+    auth: AuthChoice = typer.Option(AuthChoice.JWT, "--auth", help="Authentication method"),
+    features: str = typer.Option("", "--features", help="Comma-separated list of features (alembic,docker,testing,cors,rate_limiting)"),
+):
+    """Create a FastAPI project with specified configuration (non-interactive)"""
+    from config_manager import ProjectConfiguration, FeatureChoice
+    
+    # Parse features
+    feature_list = []
+    if features.strip():
+        feature_names = [f.strip() for f in features.split(",")]
+        feature_map = {
+            "alembic": FeatureChoice.ALEMBIC,
+            "docker": FeatureChoice.DOCKER,
+            "testing": FeatureChoice.TESTING,
+            "cors": FeatureChoice.CORS,
+            "rate_limiting": FeatureChoice.RATE_LIMITING,
+        }
+        feature_list = [feature_map[name] for name in feature_names if name in feature_map]
+    
+    # Create configuration
+    config = ProjectConfiguration()
+    config.project_name = project_name
+    config.database = database
+    config.auth = auth
+    config.features = feature_list
+    
+    # Show configuration
+    typer.echo(f"🚀 Creating FastAPI project: {project_name}")
+    typer.echo(f"   Database: {database.value}")
+    typer.echo(f"   Authentication: {auth.value}")
+    if feature_list:
+        typer.echo(f"   Features: {', '.join([f.value for f in feature_list])}")
+    
+    # Create project with the configuration
+    create_structure_with_config(project_name, config)
+
+
+def create_structure_with_config(project_name: str, config):
+    """Create project structure with provided configuration"""
+    
+    base_path = Path(project_name)
+    venv_path = base_path / 'venv'
+    app_path = base_path / "app"
+    routers_path = app_path / "routers"
+    
+    # Create directories
+    app_path.mkdir(parents=True, exist_ok=True)
+    routers_path.mkdir(parents=True, exist_ok=True)
+        
+    if sys.platform == 'win32':
+        pip_path = venv_path / 'Scripts' / 'pip'
+    else:
+        pip_path = venv_path / 'bin' / 'pip'
+
+    # Get configuration-based content
+    db_config = get_database_config(config.database)
+    auth_config = get_auth_config(config.auth)
+    file_generator = CustomizedFileGenerator(config)
+
+    # Create base files
+    (base_path / ".gitignore").write_text(files.gitignore_content)
+    (base_path / ".env").write_text(generate_env_content(config))
+    (base_path / "requirements.txt").write_text(generate_requirements(config))
+
+    # Create app files
+    (app_path / "__init__.py").touch()
+    (app_path / "main.py").write_text(file_generator.generate_main_py())
+    
+    # Database configuration
+    (app_path / "database.py").write_text(db_config["database_py"])
+    
+    # Models (use custom models for NoSQL databases)
+    if config.database in [DatabaseChoice.MONGODB, DatabaseChoice.FIREBASE]:
+        if "models_py" in db_config:
+            (app_path / "models.py").write_text(db_config["models_py"])
+        else:
+            (app_path / "models.py").write_text(files.models_py_content)
+    else:
+        (app_path / "models.py").write_text(files.models_py_content)
+    
+    # Schemas
+    (app_path / "schemas.py").write_text(files.schemas_py_content)
+    
+    # Utils (only for databases that need password hashing)
+    if config.auth == AuthChoice.JWT and config.database not in [DatabaseChoice.MONGODB, DatabaseChoice.FIREBASE]:
+        (app_path / "utils.py").write_text(files.utils_py_content)
+    elif config.database in [DatabaseChoice.MONGODB, DatabaseChoice.FIREBASE]:
+        (app_path / "utils.py").write_text(files.utils_py_content)
+    else:
+        (app_path / "utils.py").touch()
+    
+    # Auth configuration
+    if config.auth != AuthChoice.NONE:
+        (app_path / "oauth2.py").write_text(auth_config.get("oauth2_py", ""))
+        (routers_path / "__init__.py").touch()
+        (routers_path / "auth.py").write_text(file_generator.generate_auth_router())
+    else:
+        (routers_path / "__init__.py").touch()
+
+    # Handle additional features
+    handle_additional_features(config, base_path)
+
+    # Create virtual environment
+    typer.echo("🔧 Creating virtual environment...")
+    subprocess.run([sys.executable, '-m', 'venv', str(venv_path)], check=True)
+    
+    # Setup alembic if selected
+    if FeatureChoice.ALEMBIC in config.features:
+        subprocess.run([str(pip_path), "install", "alembic"], check=True)
+        alembic_init(base_path, pip_path, config)
+
+    # Install dependencies
+    typer.echo("📦 Installing dependencies in virtual environment...")
+    subprocess.run([str(pip_path), "install", "-r", str(base_path / 'requirements.txt')], check=True)
+
+    # Show completion message with instructions
+    show_completion_message(project_name, config)
+
+
+@app.command()
+def presets():
+    """Show available preset configurations"""
+    typer.echo("🎯 Available Preset Configurations:")
+    typer.echo("=" * 50)
+    
+    presets = [
+        {
+            "name": "Basic SQLite",
+            "command": "zeon create myproject --db sqlite --auth jwt",
+            "description": "Simple SQLite setup with JWT authentication"
+        },
+        {
+            "name": "PostgreSQL + Docker",
+            "command": "zeon create myproject --db postgresql --auth jwt --features alembic,docker,testing",
+            "description": "Production-ready setup with PostgreSQL, Docker, and testing"
+        },
+        {
+            "name": "MongoDB API",
+            "command": "zeon create myproject --db mongodb --auth jwt --features testing,cors",
+            "description": "NoSQL API with MongoDB and CORS enabled"
+        },
+        {
+            "name": "Supabase Backend",
+            "command": "zeon create myproject --db supabase --auth supabase --features cors,rate_limiting",
+            "description": "Full-stack ready with Supabase backend"
+        },
+        {
+            "name": "Firebase API",
+            "command": "zeon create myproject --db firebase --auth firebase --features testing,cors",
+            "description": "Serverless API with Firebase backend"
+        },
+        {
+            "name": "Microservice Ready",
+            "command": "zeon create myproject --db postgresql --auth jwt --features alembic,docker,testing,cors,rate_limiting",
+            "description": "Complete microservice setup with all features"
+        }
+    ]
+    
+    for preset in presets:
+        typer.echo(f"\n📦 {preset['name']}")
+        typer.echo(f"   {preset['description']}")
+        typer.echo(f"   Command: {preset['command']}")
+    
+    typer.echo(f"\n💡 Usage Examples:")
+    typer.echo(f"   Interactive setup: zeon init myproject")
+    typer.echo(f"   Quick setup: zeon init myproject --quick")
+    typer.echo(f"   Custom setup: zeon create myproject --db postgresql --auth jwt --features alembic,docker")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 [project]
 name = "zeon"
-version = "0.2.0"
-description = "CLI tool to scaffold a FastAPI project structure"
+version = "0.3.0"
+description = "Advanced CLI tool to scaffold customizable FastAPI projects with multiple database and authentication options"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
@@ -10,14 +10,26 @@ authors = [
   { name = "Vinyas Bharadwaj", email = "vinyasbharadwaj101@gmail.com" }
 ]
 
+keywords = ["fastapi", "cli", "scaffolding", "postgresql", "mongodb", "supabase", "firebase", "docker", "jwt"]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Database",
+]
+
 dependencies = [
-  "fastapi",
-  "uvicorn",
-  "sqlalchemy",
-  "passlib[bcrypt]",
-  "pyJWT",
-  "python-dotenv",
-  "pydantic",
+  "typer>=0.9.0",
+  "click>=8.0.0",
 ]
 
 [project.scripts]
