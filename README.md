@@ -1,17 +1,21 @@
 # Zeon 🧬
 
-**Zeon** is a Python-based CLI tool that instantly scaffolds a complete FastAPI project with built-in authentication, user management, JWT handling, and environment-based configuration — all with a single command.
+**Zeon** is a powerful Python-based CLI tool that instantly scaffolds a complete FastAPI project with built-in authentication, user management, JWT handling, database migrations, and environment-based configuration. It provides a comprehensive set of commands to manage your FastAPI project lifecycle.
 
 ---
 
 ## ✨ Features
 
-- 🚀 FastAPI project scaffolding
-- 🧠 SQLite + SQLAlchemy ORM setup
-- 🔐 JWT-based authentication
-- 🧰 Utility functions for password hashing
-- 📁 Organized folder structure (routers, models, schemas)
-- ✅ Includes `.env`, `.gitignore`, and `requirements.txt`
+- 🚀 **FastAPI Project Scaffolding** - Generate complete project structure instantly
+- 🔐 **JWT Authentication** - Built-in user authentication with OAuth2 and JWT tokens
+- 🗄️ **Database Management** - SQLite + SQLAlchemy ORM with pre-configured models
+- � **Database Migrations** - Optional Alembic integration for database versioning
+- 🛠️ **Router Generation** - Create new API routers with automatic registration
+- 📦 **Package Management** - Install packages and update requirements.txt automatically
+- 🔒 **Security Utils** - Password hashing with bcrypt
+- 🌐 **Environment Configuration** - Secure environment variable management
+- 📁 **Organized Structure** - Clean separation of concerns (routers, models, schemas)
+- 🐍 **Virtual Environment** - Automatic virtual environment creation and management
 
 ---
 
@@ -23,28 +27,187 @@ To install Zeon from [PyPI](https://pypi.org/project/zeon/):
 pip install zeon
 ```
 
-## ⚡Usage
+---
 
-To create a new FastAPI project, run:
+## 🚀 Quick Start
+
+### Initialize a New Project
 
 ```bash
-zeon myproject
+zeon init myproject
 ```
 
-This will generate the following structure inside `myproject/`:
+This creates a complete FastAPI project with the following structure:
 
-```pgsql
+```
 myproject/
+├── venv/                    # Virtual environment
 ├── app/
-│   ├── main.py
-│   ├── database.py
-│   ├── models.py
-│   ├── schemas.py
-│   ├── utils.py
-│   ├── oauth2.py
+│   ├── __init__.py
+│   ├── main.py             # FastAPI app entry point
+│   ├── database.py         # Database configuration
+│   ├── models.py           # SQLAlchemy models (User model included)
+│   ├── schemas.py          # Pydantic schemas
+│   ├── utils.py            # Utility functions (password hashing)
+│   ├── oauth2.py           # JWT authentication logic
 │   └── routers/
-│       └── auth.py
-├── .env
-├── .gitignore
-├── requirements.txt
+│       ├── __init__.py
+│       └── auth.py         # Authentication endpoints
+├── alembic/                # Database migrations (optional)
+├── alembic.ini            # Alembic configuration (optional)
+├── .env                   # Environment variables
+├── .gitignore            # Git ignore file
+└── requirements.txt      # Python dependencies
 ```
+
+---
+
+## 📚 Commands
+
+### Project Initialization
+
+```bash
+zeon init <project_name>
+```
+- Creates complete FastAPI project structure
+- Sets up virtual environment
+- Installs all dependencies
+- Optionally configures Alembic for database migrations
+- Generates secure environment variables
+
+### Router Management
+
+```bash
+zeon routers <router_name> [project_name]
+```
+- Creates a new router in `app/routers/`
+- Automatically adds import and registration to `main.py`
+- Includes basic GET endpoint template
+
+Example:
+```bash
+zeon routers users
+# Creates app/routers/users.py and registers it in main.py
+```
+
+### Package Management
+
+```bash
+zeon add <package_name> [project_name]
+```
+- Installs package in the project's virtual environment
+- Automatically updates `requirements.txt` with all dependencies
+
+Example:
+```bash
+zeon add redis
+# Installs redis and updates requirements.txt
+```
+
+### Database Migrations (Alembic)
+
+```bash
+# Create migration
+zeon makemigrations [message] [project_name]
+
+# Apply migrations
+zeon migrate [project_name]
+```
+
+Examples:
+```bash
+zeon makemigrations "Add user profile"
+zeon migrate
+```
+
+---
+
+## 🔐 Built-in Authentication
+
+Zeon includes a complete authentication system:
+
+### Endpoints
+- `POST /auth/register` - User registration
+- `POST /auth/login` - User login (returns JWT token)
+- `GET /auth/user/{id}` - Get user by ID
+
+### Features
+- Password hashing with bcrypt
+- JWT token generation and validation
+- OAuth2 password flow
+- User model with SQLAlchemy
+- Pydantic schemas for validation
+
+### Example Usage
+
+```python
+# Register a new user
+POST /auth/register
+{
+    "username": "john_doe",
+    "email": "john@example.com", 
+    "password": "securepassword"
+}
+
+# Login
+POST /auth/login
+Form data: username=john_doe&password=securepassword
+
+# Response
+{
+    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGci...",
+    "token_type": "bearer"
+}
+```
+
+---
+
+## 🔧 Environment Configuration
+
+Zeon automatically generates a `.env` file with:
+
+```env
+SECRET_KEY=<auto-generated-secure-key>
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+---
+
+## 🚀 Running Your Project
+
+After creating a project:
+
+```bash
+cd myproject
+
+# Activate virtual environment
+# Windows
+venv\Scripts\activate
+# Unix/macOS
+source venv/bin/activate
+
+# Run the development server
+uvicorn app.main:app --reload
+```
+
+Your API will be available at `http://localhost:8000` with automatic documentation at `http://localhost:8000/docs`.
+
+---
+
+## 📋 Requirements
+
+- Python 3.8+
+- pip
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.

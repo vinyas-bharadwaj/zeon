@@ -1,27 +1,58 @@
 [project]
 name = "zeon"
-version = "0.2.0"
-description = "CLI tool to scaffold a FastAPI project structure"
+version = "1.0.0"
+description = "A powerful CLI tool to scaffold and manage FastAPI projects with authentication, database migrations, and more"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license = "MIT"
+keywords = ["fastapi", "cli", "scaffolding", "web", "api", "authentication", "jwt", "sqlalchemy", "alembic"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+]
 
 authors = [
   { name = "Vinyas Bharadwaj", email = "vinyasbharadwaj101@gmail.com" }
 ]
 
 dependencies = [
-  "fastapi",
-  "uvicorn",
-  "sqlalchemy",
-  "passlib[bcrypt]",
-  "pyJWT",
-  "python-dotenv",
-  "pydantic",
+  "typer>=0.9.0",
+  "fastapi>=0.100.0",
+  "uvicorn[standard]>=0.20.0",
+  "sqlalchemy>=2.0.0",
+  "passlib[bcrypt]>=1.7.4",
+  "python-jose[cryptography]>=3.3.0",
+  "python-multipart>=0.0.6",
+  "python-dotenv>=1.0.0",
+  "pydantic[email]>=2.0.0",
+  "alembic>=1.12.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0.0",
+  "pytest-asyncio>=0.21.0",
+  "httpx>=0.24.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/vinyasbharadwaj/zeon"
+Repository = "https://github.com/vinyasbharadwaj/zeon"
+Documentation = "https://github.com/vinyasbharadwaj/zeon#readme"
+"Bug Tracker" = "https://github.com/vinyasbharadwaj/zeon/issues"
+
 [project.scripts]
-zeon = "main:main"
+zeon = "zeon.main:app"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
